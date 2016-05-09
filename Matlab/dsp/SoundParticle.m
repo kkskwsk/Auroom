@@ -40,7 +40,7 @@ classdef SoundParticle < handle
                 if intersectsReceiver && (distRec < distWall)
                     ray.setLength(distRec);
                     this.distance = this.distance + calcSizeInMeters(abs(distRec));
-                    this.filters(end + 1) = Filter('HRTF', angle); %pamietac o dodaniu odpowiedniego k¹ta
+                    this.filters(end + 1) = Filter('HRTF'); %pamietac o dodaniu odpowiedniego k¹ta
                     break; 
                 end
                 

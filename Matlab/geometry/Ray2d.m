@@ -4,13 +4,7 @@ classdef Ray2d < handle
         directionVector;
         length;
     end
-    %--------------
-    %Constants
-    %--------------
-    %-----------------------------------------------------------
-    %--------------
-    %Public Methods
-    %--------------
+    
     methods (Access = 'public')
         %Constructor
         function this = Ray2d(originVector, directionVector)
@@ -43,17 +37,16 @@ classdef Ray2d < handle
             %[Xd, Xa-Xb] [l] = [Xa - Xo]
             %[Yd, Ya-Yb] [t]   [Ya - Yo]
             
-            Xo = this.originVector.getX();
-            Yo = this.originVector.getY();
-            Xd = this.directionVector.getX();
-            Yd = this.directionVector.getY();
-            Xa = line.getOriginVertex().getX();
-            Ya = line.getOriginVertex().getY();
-            Xb = line.getEndVertex().getX();
-            Yb = line.getEndVertex().getY();
-            A = [Xd, Xa - Xb; Yd, Ya - Yb];
-            B = [Xa - Xo; Ya - Yo];
-            params = linsolve(A, B);
+            A = [this.directionVector.getX(), line.getOriginVertex().getX() - line.getEndVertex().getX(); this.directionVector.getY(), line.getOriginVertex().getY() - line.getEndVertex().getY()];
+            B = [line.getOriginVertex().getX() - this.originVector.getX(); line.getOriginVertex().getY() - this.originVector.getY()];
+            %tic
+            %params = linsolve(A, B);
+            if (~isequal(A(2,:), [0, 0]))
+                params = linsolve(A, B);
+            else
+                params = [Inf, Inf];
+            end
+            %fprintf(1, 'Time of equation solving: %d [sec], result: [%d, %d]\n', toc, params(1), params(2));
             
             if (params(2) < 0) || (params(2) > 1) || (params(1) < 0.0001)
                 isTrue = false;
@@ -67,20 +60,21 @@ classdef Ray2d < handle
         function [isTrue, len, point] = intersectCircle(this, circle)
             rayOriginCircleCenterVector = circle.getCenter() - this.originVector;
             v = Vec2d.dotProd(rayOriginCircleCenterVector, this.directionVector);
-            squaredRadius = circle.getRadius()^2;
-            disc = squaredRadius - Vec2d.dotProd(rayOriginCircleCenterVector, rayOriginCircleCenterVector) + v^2;
+            disc = circle.getRadius()^2 - Vec2d.dotProd(rayOriginCircleCenterVector, rayOriginCircleCenterVector) + v^2;
             if (disc < 0)
                 isTrue = false;
                 len = 0;
                 point = 0;
             else
-                d = sqrt(disc);
-                len = v - d;
+                len = v - sqrt(disc);
+                if (len < 0)
+                    isTrue = false;
+                    point = 0;
+                    len = 0;
+                    return;
+                end
                 isTrue = true;
                 point = this.originVector + this.directionVector*len;
-                disp('Point of incidence:');
-                disp(point.getX());
-                disp(point.getY());
             end
         end
         
@@ -90,8 +84,14 @@ classdef Ray2d < handle
         end
         
         %Getters
+        function originVector = getOriginVector(this)
+            originVector = this.originVector;
+        end
         function endVector = getEndVector(this)
             endVector = Vec2d(this.originVector.getX() + this.length*this.directionVector.getX(), this.originVector.getY() + this.length*this.directionVector.getY());
+        end
+        function directionVector = getDirectionVector(this)
+            directionVector = this.directionVector;
         end
         function length = getLength(this)
             length = this.length;

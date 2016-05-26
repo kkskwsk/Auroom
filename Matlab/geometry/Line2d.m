@@ -27,8 +27,8 @@ classdef Line2d < handle
         end
         
         function initWithAngleLength(this, originVertex, angle, length, color)
-            endX = originVertex.getX() + length * cos(2*pi *(angle/360));
-            endY = originVertex.getY() + length * sin(2*pi *(angle/360));
+            endX = originVertex.getX() + length * cosd(angle);
+            endY = originVertex.getY() + length * sind(angle);
             this.endVertex = Vec2d(endX, endY);
             this.originVertex = originVertex;
             this.normalVector = this.calcNormal();
@@ -63,6 +63,10 @@ classdef Line2d < handle
         end
         function normalVector = getNormalVector(this)
             normalVector = this.normalVector;
+        end
+        function length = getLength(this)
+            translatedToOrigin = this.endVertex - this.originVertex;
+            length = sqrt(translatedToOrigin.getX()^2 + translatedToOrigin.getY()^2); 
         end
     end
     %--------------

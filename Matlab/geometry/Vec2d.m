@@ -24,18 +24,28 @@ classdef Vec2d < handle
             length = sqrt(this.x^2 + this.y^2);
         end
         
+        function r = eq(vec1, vec2)
+            if (vec1.x == vec2.x && vec1.y == vec2.y)
+                r = true;
+            else
+                r = false;
+            end
+        end
+        
         function r = plus(vec1, vec2)
-            r = Vec2d(vec1.getX() + vec2.getX(), vec1.getY() + vec2.getY());
+            r = Vec2d(vec1.x + vec2.x, vec1.y + vec2.y);
         end
         
         function r = minus(vec1, vec2)
-            r = Vec2d(vec1.getX() - vec2.getX(), vec1.getY() - vec2.getY());
+            r = Vec2d(vec1.x - vec2.x, vec1.y - vec2.y);
         end
         function r = mtimes(vec1, scalar)
-            if isa(scalar, 'Vec2d')
-                error('bad input');
-            end
-            r = Vec2d(vec1.getX() * scalar, vec1.getY() * scalar);
+            r = Vec2d(vec1.x * scalar, vec1.y * scalar);
+        end
+        
+        function normalizedVector = normalize(this)
+            length = sqrt(this.x^2 + this.y^2);
+            normalizedVector = Vec2d(this.x/length, this.y/length);
         end
         
         %Getters

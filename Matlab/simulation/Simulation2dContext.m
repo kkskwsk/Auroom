@@ -10,7 +10,6 @@ classdef Simulation2dContext < handle
         settings;
         distanceThreshold;
         speedOfSound;
-        info;
         filtersMap;
         
         imageSources;
@@ -33,7 +32,6 @@ classdef Simulation2dContext < handle
     methods (Access = 'public')
         function this = Simulation2dContext()
             %init all properties
-            this.info = 'Symulacja testowa Kacpra';
             this.initializeFilters();
             this.initSettings();
             
@@ -47,7 +45,7 @@ classdef Simulation2dContext < handle
                                              this.settings.sourceModel.realSize, ...
                                              this.settings.sourceModel.soundPowerLevel, ...
                                              this.settings.sourceModel.directivityFactor);
-            this.sourceModel.setNumberOfParticles(1000);
+            this.sourceModel.setNumberOfParticles(2000);
             
             this.receiverModel = Receiver2dModel(this.settings.receiverModel.positionVector, ...
                                                  this.settings.receiverModel.directionAngle, ...
@@ -128,17 +126,51 @@ classdef Simulation2dContext < handle
             result = false;
         end
         
-        function resultSound = auralize(this, sound)
-            if (sound.getSampleRate() ~= this.settings.simulation.sampleRate)
-                error('Incorrect input signal sampling rate.');
+        function auralize(this, filename)
+            frameLength = this.settings.dsp.frameLength;
+            fileReader = dsp.AudioFileReader(filename, 'SamplesPerFrame', frameLength);
+            i = info(fileReader);
+            if (i.NumChannels ~= 1)
+                error('To many channels. Cannot auralize a stereo sound. First convert to mono.');
             end
             
-            soundBuffer = sound.getBuffer();
+            %TO DO: Check how to choose a device? Speakers/file. It is
+            %necessary to choose if the sound should be played or just
+            %saved to a new file.
+            deviceWriter = audioDeviceWriter('SampleRate', fileReader.SampleRate);
             
-            resultBuffer(:, 1) = Dsp.filter(soundBuffer, this.leftEarFilter);
-            resultBuffer(:, 2) = Dsp.filter(soundBuffer, this.rightEarFilter);
+            %I assume that both ears' impulse responses are of equal
+            %length.
+            impulseResponseLength = length(this.leftEarFilter.getCoeffsB());
             
-            resultSound = Sound(0, sound.getBitsPerSample(), resultBuffer, sound.getSampleRate());
+            if (impulseResponseLength ~= 1)
+                overlapLength = impulseResponseLength - 1;
+                leftEarOverlap  = zeros(overlapLength, 1);
+                rightEarOverlap = zeros(overlapLength, 1);
+                
+                while ~isDone(fileReader)
+                    rightEarOverlap = [rightEarOverlap; zeros(frameLength - overlapLength, 1)];
+                    leftEarOverlap = [leftEarOverlap; zeros(frameLength - overlapLength, 1)];
+                    chunk = step(fileReader);
+                    processedLeftEarChunk = Dsp.filter(chunk, this.leftEarFilter);
+                    processedRightEarChunk = Dsp.filter(chunk, this.rightEarFilter);
+                    chunkToPlay(:,1) = leftEarOverlap(1:frameLength) + processedLeftEarChunk(1:frameLength);
+                    chunkToPlay(:,2) = rightEarOverlap(1:frameLength) + processedRightEarChunk(1:frameLength);
+                    leftEarOverlap(end+1:end+min(frameLength, overlapLength)) = 0;
+                    rightEarOverlap(end+1:end+min(frameLength, overlapLength)) = 0;
+                    leftEarOverlap = processedLeftEarChunk(frameLength+1:end) + leftEarOverlap(frameLength+1:end);
+                    rightEarOverlap = processedRightEarChunk(frameLength+1:end) + rightEarOverlap(frameLength+1:end);
+                    play(deviceWriter, chunkToPlay);
+                end
+            else
+                while ~isDone(fileReader)
+                    chunk = step(fileReader);
+                    chunkToPlay(:,1) = Dsp.filter(chunk, this.leftEarFilter);
+                    chunkToPlay(:,2) = Dsp.filter(chunk, this.rightEarFilter);
+                    play(deviceWriter, chunkToPlay);
+                end
+            end
+            
         end
         
         %Getters
@@ -198,10 +230,11 @@ classdef Simulation2dContext < handle
             this.settings.simulation.energyThreshold = 5;
             this.settings.simulation.temperature = 21; %Celsius
             this.settings.simulation.speedOfSound = 331.5 + 0.6*this.settings.simulation.temperature; %m/s
-            this.settings.simulation.timeThreshold = 1; %seconds
+            this.settings.simulation.timeThreshold = 3; %seconds
             this.settings.simulation.distanceThreshold = this.settings.simulation.timeThreshold * this.settings.simulation.speedOfSound; 
             this.settings.simulation.sampleRate = 44100;
             
+            this.settings.dsp.frameLength = 4096;
             this.checkSceneSanity();
         end
         

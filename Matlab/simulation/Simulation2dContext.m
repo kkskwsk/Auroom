@@ -10,9 +10,13 @@ classdef Simulation2dContext < handle
         settings;
         distanceThreshold;
         speedOfSound;
-        sound;
-        synthesizedSound;
         info;
+        filtersMap;
+        
+        imageSources;
+        
+        leftEarFilter;
+        rightEarFilter;
     end
     %--------------
     %Constants
@@ -30,7 +34,7 @@ classdef Simulation2dContext < handle
         function this = Simulation2dContext()
             %init all properties
             this.info = 'Symulacja testowa Kacpra';
-            
+            this.initializeFilters();
             this.initSettings();
             
             this.roomModel = Room2dModel(this.settings.roomModel.vertices, ...
@@ -43,6 +47,8 @@ classdef Simulation2dContext < handle
                                              this.settings.sourceModel.realSize, ...
                                              this.settings.sourceModel.soundPowerLevel, ...
                                              this.settings.sourceModel.directivityFactor);
+            this.sourceModel.setNumberOfParticles(1000);
+            
             this.receiverModel = Receiver2dModel(this.settings.receiverModel.positionVector, ...
                                                  this.settings.receiverModel.directionAngle, ...
                                                  this.settings.receiverModel.realSize);
@@ -51,7 +57,6 @@ classdef Simulation2dContext < handle
                                                    this.settings.drawing.lineWidth);
             this.distanceThreshold = this.settings.simulation.distanceThreshold;
             this.speedOfSound = this.settings.simulation.speedOfSound;
-
         end
         
         function drawScene(this)
@@ -66,38 +71,74 @@ classdef Simulation2dContext < handle
             imshow(this.drawingContext.getCanvas());
         end
         
-        function processGeometry(this)
-            this.sourceModel.setNumberOfParticles(2000);
+        function start(this)
             this.sourceModel.shootParticles(this);
+            this.calcImpulseResponse();
         end
         
-        function processSounds(this, filename)
-            sound = SoundBuffer(filename, 16, 0, 0);
-            this.sound = sound;
-            synthesizedBuffer = SoundBuffer(0, sound.getBitsPerSample(), [0], sound.getSampleRate());
+        function calcImpulseResponse(this)
+            impulse = [1];
             particles = this.sourceModel.getParticles();
-            
+            leftChannel = 0;
+            rightChannel = 0;
+            x=0;
+            imageSourcesCounter = 0;
+            tic
             for i = 1:length(particles)
-                [isSuccess, soundBuffer] = sound.process(particles(i), this);
-                if isSuccess
-                    synthesizedBuffer = synthesizedBuffer + soundBuffer;
+                soundParticle = particles(i);
+                if soundParticle.isReceived()
+                    receptions = soundParticle.getReceptions();
+                    for j = 1%:length(receptions)
+                        if this.isImageSourceConsidered(soundParticle, j)
+                            x = x+1; 
+                            continue;
+                        end
+                        imageSourcesCounter = imageSourcesCounter + 1;
+                        imageSource = ImageSource2d(soundParticle, j);
+                        this.imageSources = [this.imageSources imageSource];
+                        [leftEarImpulseResponse, rightEarImpulseResponse] = this.receiverModel.binauralize(imageSource, impulse, this);
+                        leftChannel = Dsp.addBuffers(leftChannel, leftEarImpulseResponse);
+                        rightChannel = Dsp.addBuffers(rightChannel, rightEarImpulseResponse);
+                    end
+                    
+               end
+            end
+            fprintf(1, 'Image sources processing time: %d [sec]\n', toc);
+            time = 1/this.settings.simulation.sampleRate:1/this.settings.simulation.sampleRate:length(leftChannel)/this.settings.simulation.sampleRate;
+            this.leftEarFilter = Filter(1, leftChannel, this.settings.simulation.sampleRate, 'leftEar');
+            this.rightEarFilter = Filter(1, rightChannel, this.settings.simulation.sampleRate, 'rightEar');
+            figure();
+            plot(time, leftChannel);
+            title('Left channel IR');
+            figure();
+            plot(time, rightChannel);
+            title('Right channel IR');
+            imageSourcesCounter
+        end
+        
+        function result = isImageSourceConsidered(this, particle, receptionNo)
+            reception = particle.getReception(receptionNo);
+            receptionWalls = reception.getWalls();
+            for i=1:length(this.imageSources)
+                if isequal(this.imageSources(i).getWalls(), receptionWalls)
+                    result = true;
+                    return;
                 end
             end
-            this.synthesizedSound = synthesizedBuffer;
-            figure();
-            t=1/synthesizedBuffer.getSampleRate():1/synthesizedBuffer.getSampleRate():length(synthesizedBuffer.getBuffer())/synthesizedBuffer.getSampleRate();
-            plot(t, synthesizedBuffer.getBuffer());
-            title('Processed audio file');
-            ylabel('Sample level');
-            xlabel('Time [s]');
+            result = false;
         end
         
-        function playSynthBuf(this)
-            this.synthesizedSound.play(1);
-        end
-        
-        function playOriginalBuf(this)
-            this.sound.play(1);
+        function resultSound = auralize(this, sound)
+            if (sound.getSampleRate() ~= this.settings.simulation.sampleRate)
+                error('Incorrect input signal sampling rate.');
+            end
+            
+            soundBuffer = sound.getBuffer();
+            
+            resultBuffer(:, 1) = Dsp.filter(soundBuffer, this.leftEarFilter);
+            resultBuffer(:, 2) = Dsp.filter(soundBuffer, this.rightEarFilter);
+            
+            resultSound = Sound(0, sound.getBitsPerSample(), resultBuffer, sound.getSampleRate());
         end
         
         %Getters
@@ -116,6 +157,10 @@ classdef Simulation2dContext < handle
         function speedOfSound = getSpeedOfSound(this)
             speedOfSound = this.speedOfSound;
         end
+        
+        function settings = getSettings(this)
+            settings = this.settings;
+        end
     end
     %--------------
     %Private Methods
@@ -126,37 +171,43 @@ classdef Simulation2dContext < handle
             this.settings.drawing.canvasSizeY = this.DRAWING_CANVAS_SIZE_Y;
             this.settings.drawing.lineWidth = this.DRAWING_LINE_WIDTH;
             
-            this.settings.roomModel.vertices = [[50 100] [1700 70] [1800 1900] [50 1600] [1900 1000]]; 
-            this.settings.roomModel.lines = [1 2; 2 5; 5 3; 3 4; 4 1];
-            this.settings.roomModel.materials = [Material('wood', [.7 .5 0], 0), ...
-                                                Material('wood', [.7 .5 0], 0), ...
-                                                Material('wood', [.7 .5 0], 0), ...
-                                                Material('wood', [.7 .5 0], 0), ...
-                                                Material('wood', [.7 .5 0], 0)];
+            this.settings.roomModel.vertices = [[50 100] [1250 100] [1250 1600] [50 1600]]; 
+            this.settings.roomModel.lines = [1 2; 2 3; 3 4; 4 1];
+            material = Material('wood', [.7 .5 0], this.filtersMap('woodenWall'));
+            this.settings.roomModel.materials = [material, ...
+                                                material, ...
+                                                material, ...
+                                                material];
             this.settings.roomModel.medium = 'air';
             
-            this.settings.sourceModel.positionX = 200;
-            this.settings.sourceModel.positionY = 250;
+            this.settings.sourceModel.positionX = 1000;
+            this.settings.sourceModel.positionY = 1400;
             this.settings.sourceModel.positionVector = Vec2d(this.settings.sourceModel.positionX, this.settings.sourceModel.positionY);
-            this.settings.sourceModel.directionAngle = 30; %in degrees
-            this.settings.sourceModel.realSize = 0.5; %in meters
+            this.settings.sourceModel.directionAngle = 180; %in degrees
+            this.settings.sourceModel.realSize = 0.5; %in meters 
             this.settings.sourceModel.soundPowerLevel = 100; % dB
             this.settings.sourceModel.directivityFactor = 1; %Full sphere radiation (Q = 1)
             
 
-            this.settings.receiverModel.positionX = 1200;
-            this.settings.receiverModel.positionY = 1300;
+            this.settings.receiverModel.positionX = 200;
+            this.settings.receiverModel.positionY = 250;
             this.settings.receiverModel.positionVector = Vec2d(this.settings.receiverModel.positionX, this.settings.receiverModel.positionY);
-            this.settings.receiverModel.directionAngle = 200; %in degrees
-            this.settings.receiverModel.realSize = 0.3; %in meters
+            this.settings.receiverModel.directionAngle = 40; %in degrees
+            this.settings.receiverModel.realSize = 0.4; %in meters
             
             this.settings.simulation.energyThreshold = 5;
             this.settings.simulation.temperature = 21; %Celsius
             this.settings.simulation.speedOfSound = 331.5 + 0.6*this.settings.simulation.temperature; %m/s
-            this.settings.simulation.timeThreshold = 10; %seconds
+            this.settings.simulation.timeThreshold = 1; %seconds
             this.settings.simulation.distanceThreshold = this.settings.simulation.timeThreshold * this.settings.simulation.speedOfSound; 
+            this.settings.simulation.sampleRate = 44100;
             
             this.checkSceneSanity();
+        end
+        
+        function initializeFilters(this)
+            this.filtersMap = containers.Map('KeyType','char','ValueType','any');
+            this.filtersMap('woodenWall') = Filter(1, 0.9, 44100, 'wood'); %[0; 0; 0; 0.1; 0.2; 0.3; 0.2; 0.1; 0; 0; 0]
         end
         
         function checkSceneSanity(this)

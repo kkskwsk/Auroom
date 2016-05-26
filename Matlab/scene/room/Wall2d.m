@@ -5,6 +5,7 @@ classdef Wall2d < handle
     properties (GetAccess = 'private', SetAccess = 'private')
         line;
         material;
+        id;
     end
     %--------------
     %Constants
@@ -15,10 +16,11 @@ classdef Wall2d < handle
     %--------------
     methods (Access = 'public')
         %Constructor
-        function this = Wall2d(originVertex, endVertex, material)
+        function this = Wall2d(originVertex, endVertex, material, id)
             if (nargin > 0)
                 this.line = Line2d(originVertex, endVertex, material.getColor());
                 this.material = material;
+                this.id = id;
             end
         end
         

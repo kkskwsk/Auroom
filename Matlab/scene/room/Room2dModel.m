@@ -23,9 +23,22 @@ classdef Room2dModel < handle
                 originVertex = Vec2d(vertices(2*originIndex - 1), vertices(2*originIndex));
                 endIndex = lines(i, 2);
                 endVertex = Vec2d(vertices(2*endIndex - 1), vertices(2*endIndex));
-                this.walls(i) = Wall2d(originVertex, endVertex, materials(i));
+                this.walls(i) = Wall2d(originVertex, endVertex, materials(i), i);
             end
             this.medium = medium;
+        end
+        
+        function [minLen, wall, reflectionDirVector] = reflect(this, ray)
+            minLen = [];
+            for i = 1:length(this.walls)
+                [isTrue, len] = ray.intersectLineSegment(this.walls(i).getLine());
+                if isTrue && (isempty(minLen) || (minLen > len))
+                    wall = this.walls(i);
+                    minLen = len;
+                end
+            end
+            
+            reflectionDirVector = ray.calcReflectionDirVector(wall.getLine()); 
         end
         
         function draw(this, drawing2dContext)
@@ -53,5 +66,9 @@ classdef Room2dModel < handle
                 error('Invalid input argument');
             end
         end
+    end
+    
+    methods(Access = 'public', Static = true) 
+        
     end
 end

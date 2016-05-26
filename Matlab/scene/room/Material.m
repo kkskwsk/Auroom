@@ -5,7 +5,7 @@ classdef Material < handle %<attenuator
     properties (GetAccess = 'private', SetAccess = 'private')
         name;
         color;
-        absorptionCoeff;
+        filter;
     end
     %--------------
     %Constants
@@ -16,10 +16,10 @@ classdef Material < handle %<attenuator
     %--------------
     methods (Access = 'public')
         %Constructor
-        function this = Material(name, color, absorptionCoeff)
+        function this = Material(name, color, filter)
             this.name = name;
             this.color = color;
-            this.absorptionCoeff = absorptionCoeff;
+            this.filter = filter;
         end
         
         %Getters
@@ -29,8 +29,8 @@ classdef Material < handle %<attenuator
         function color = getColor(this)
             color = this.color;
         end
-        function absorptionCoeff = getAbsorptionCoeff(this)
-            absorptionCoeff = this.absorptionCoeff;
+        function filter = getFilter(this)
+            filter = this.filter;
         end
     end
     %--------------

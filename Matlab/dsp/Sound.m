@@ -3,26 +3,36 @@ classdef Sound < handle
         buffer;
         sampleRate;
         bitsPerSample
+        
+        audioPlayer;
     end
     
     methods (Access = 'public')
         function this = Sound(filename, bitsPerSample, buffer, sampleRate)
             if filename ~= 0 
                 [this.buffer,this.sampleRate] = audioread(filename);
-                this.buffer = this.buffer/(max(max(this.buffer)));
-                t=1/this.sampleRate:1/this.sampleRate:length(this.buffer)/this.sampleRate;
-                figure();
-                plot(t, this.buffer);
-                title('Input audio file');
-                ylabel('Sample level');
-                xlabel('Time [s]');
-                
+                if size(this.buffer,2) == 2
+                    this.buffer(:,1) = this.buffer(:,1) + this.buffer(:,2);
+                    this.buffer(:,2) = [];
+                end
+                this.buffer = this.buffer/(max(this.buffer)+0.7); %¿eby nie przesterowa³o
                 this.bitsPerSample = bitsPerSample;
+                this.audioPlayer = audioplayer(this.buffer, this.sampleRate);
                 return;
             end
             this.bitsPerSample = 16;
             this.buffer = buffer;
             this.sampleRate = sampleRate;
+            this.audioPlayer = audioplayer(this.buffer, this.sampleRate);
+        end
+        
+        function draw(this)
+            t=1/this.sampleRate:1/this.sampleRate:length(this.buffer)/this.sampleRate;
+            figure();
+            plot(t, this.buffer);
+            title('Audio file');
+            ylabel('Sample level');
+            xlabel('Time [s]');
         end
         
         function r = mrdivide(buf1, divider)
@@ -45,10 +55,21 @@ classdef Sound < handle
         
         function play(this, scale)
             if scale
-                soundsc(this.buffer, this.sampleRate, this.bitsPerSample);
+                %soundsc(this.buffer, this.sampleRate, this.bitsPerSample);
             else
-                sound(this.buffer, this.sampleRate, this.bitsPerSample);
+                play(this.audioPlayer);
+                %sound(this.buffer, this.sampleRate, this.bitsPerSample);
             end
+        end
+        
+        function pause(this)
+            pause(this.audioPlayer);
+        end
+        function resume(this)
+            resume(this.audioPlayer);
+        end
+        function stop(this)
+            stop(this.audioPlayer);
         end
         
         function sampleRate = getSampleRate(this)

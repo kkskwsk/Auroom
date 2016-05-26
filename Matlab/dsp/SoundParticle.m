@@ -2,9 +2,11 @@ classdef SoundParticle < handle
     properties (GetAccess = 'private', SetAccess = 'private')
         initialSettings;
         rays; %container
-        startEnergy;
+        startAngle;
         distance;
-        filters; %container
+        walls; %container
+        received;
+        receptions;
     end
     %--------------
     %Constants
@@ -15,45 +17,101 @@ classdef SoundParticle < handle
     %--------------
     methods (Access = 'public')
         %Constructor
-        function this = SoundParticle(sourceModel, angle, startEnergy)
+        function this = SoundParticle(sourceModel, angle)
             this.initialSettings.angle = sourceModel.getDirectionAngle() + angle;
             this.initialSettings.originVector = sourceModel.getPositionVector();
             %this.rays(1) = Ray2d(originVector, angle);
             this.distance = 0;
-            this.startEnergy = startEnergy;
-            this.filters = Filter.empty(0);
+            this.startAngle = angle;
+            this.walls = Wall2d.empty(0);
+            this.received = false;
+            this.receptions = Reception.empty(0);
         end
         
         function shoot(this, simulation2dContext)
+            %disp('============SHOOT================')
+            %tic
             distanceThreshold = simulation2dContext.getDistanceThreshold();
-            
             originVector = this.initialSettings.originVector;
             angle = this.initialSettings.angle;
-            directionVector = Vec2d(cos(2*pi*angle/360), sin(2*pi*angle/360));
-            
+            directionVector = Vec2d(cosd(angle), sind(angle));
+            checkReceiver = true;
+            %fprintf(1, 'Beginning step of shoot: %d sec', toc);
+            %receiverCheckTimes = 0;
+            %wallCheckTimes = 0;
+            %tic
             while (this.distance <= distanceThreshold)
+                %tic
                 this.rays = [this.rays Ray2d(originVector, directionVector)];
                 ray = this.rays(end);
-                [intersectsReceiver, distRec, angle] = SoundParticle.intersectReceiver(ray, simulation2dContext.getReceiverModel());
-                [distWall, wall, directionVector] = SoundParticle.reflect(ray, simulation2dContext.getRoomModel());
+                %fprintf(1, 'Ray creation: %d sec\n', toc);
+                
+                %tic
+                if checkReceiver
+                    [intersectsReceiver, distRec, angle] = simulation2dContext.getReceiverModel().intersect(ray);
+                end
+                %temp = toc;
+                %receiverCheckTimes = [receiverCheckTimes temp];
+                %fprintf(1, 'Receiver check: %d sec\n', temp);
+                
+                %tic
+                [distWall, wall, directionVector] = simulation2dContext.getRoomModel().reflect(ray);
+                %temp = toc;
+                %wallCheckTimes = [wallCheckTimes temp];
+                %fprintf(1, 'Wall check: %d sec\n', toc);
+                
                 
                 if intersectsReceiver && (distRec < distWall)
+                    %tic
                     ray.setLength(distRec);
                     this.distance = this.distance + calcSizeInMeters(abs(distRec));
-                    this.filters(end + 1) = Filter('HRTF'); %pamietac o dodaniu odpowiedniego k¹ta
-                    break; 
+                    this.received = true;
+                    this.receptions = [this.receptions Reception(ray, this.walls, this.distance)];
+                    originVector = ray.getEndVector();
+                    directionVector = ray.getDirectionVector();
+                    checkReceiver = false;
+                    intersectsReceiver = false;
+                    %fprintf(1, 'Handling Receiver incidence of tracing loop: %d sec\n', toc);
+                    continue; 
                 end
                 
-                this.filters(end + 1) = Filter(wall.getMaterial());
+                
+                %tic
+                this.walls(end + 1) = wall;
                 ray.setLength(distWall);
                 this.distance = this.distance + calcSizeInMeters(abs(distWall));
                 originVector = ray.getEndVector();
+                checkReceiver = true;
+                %fprintf(1, 'Handling wall incidence of tracing loop: %d sec\n', toc);
             end
+            %fprintf(1, 'Time of processing particle: %d\n', toc);
             
+            %tic
             if (this.distance > distanceThreshold)
                 excess = this.distance - distanceThreshold;
                 ray.setLength(ray.getLength() - calcSizeInPixels(excess));
+                if (this.received == true && isequal(this.receptions(end).getLastRay(), ray))
+                    this.receptions(end) = [];
+                    if isempty(this.receptions)
+                        this.received = false;
+                    end
+                else
+                    this.walls(end) = [];
+                end
             end
+            %fprintf(1, 'Last step of tracing loop: %d sec\n', toc);
+            %disp('============STOP================')
+            %figure()
+            %plot(receiverCheckTimes);
+            %title('Receiver check Times');
+            %xlabel('Check index');
+            %ylabel('Time [s]');
+            %figure()
+            %plot(wallCheckTimes);
+            %title('Wall check Times');
+            %xlabel('Check index');
+            %ylabel('Time [s]');
+            
         end
         
         function draw(this, drawing2dContext)
@@ -62,53 +120,26 @@ classdef SoundParticle < handle
             end
         end 
         
+        function rays = getRays(this)
+            rays = this.rays;
+        end
         function distance = getDistance(this)
             distance = this.distance;
         end
-        function startEnergy = getStartEnergy(this)
-            startEnergy = this.startEnergy;
+        function startAngle = getStartAngle(this)
+            startAngle = this.startAngle;
         end
-        function lastFilter = getLastFilter(this)
-            lastFilter = this.filters(end).getType();
+        function received = isReceived(this)
+            received = this.received;
         end
-    end
-    
-    methods(Access = 'private', Static = true) 
-        function [minLen, wall, reflectionDirVector] = reflect(ray, roomModel)
-            walls = roomModel.getWalls();
-            minLen = [];
-            for i = 1:length(walls)
-                line = walls(i).getLine();
-                [isTrue, len] = ray.intersectLineSegment(line);
-                if isTrue && (isempty(minLen) || (minLen > len))
-                    wall = walls(i);
-                    minLen = len;
-                end
-            end
-            
-            reflectionDirVector = ray.calcReflectionDirVector(wall.getLine()); 
+        function filters = getWalls(this)
+            filters = this.walls;
         end
-        
-        function [isTrue, len, angle] = intersectReceiver(ray, receiverModel)
-            [isTrue, len, point] = ray.intersectCircle(receiverModel.getShape());
-            if isTrue
-                disp(point.getX());
-                disp(point.getY());
-                dirVec = point - receiverModel.getShape().getCenter();
-                disp('dirvec: \n');
-                x = dirVec.getX();
-                y = dirVec.getY();
-                disp(dirVec.getX());
-                disp(dirVec.getY());
-                angle = (180/pi) * atan(dirVec.getY()/dirVec.getX());
-                if (x < 0)
-                    angle = angle + 180;
-                end
-                angle = angle - receiverModel.getDirectionAngle();
-                
-                return;
-            end
-            angle = 0;
+        function receptions = getReceptions(this)
+            receptions = this.receptions;
+        end
+        function reception = getReception(this, no)
+            reception = this.receptions(no);
         end
         
     end

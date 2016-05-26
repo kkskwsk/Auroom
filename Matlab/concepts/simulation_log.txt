@@ -1,0 +1,27 @@
+Drawing time: 5.000000 seconds
+Drawing time: 0.004304 seconds
+Number of particles: 320, Simulation time: 46.959952 seconds
+Drawing time: 5.000000 seconds
+Drawing time: 0.002660 seconds
+Number of particles: 320, Simulation time: 48.517609 seconds
+Drawing time: 5.000000 seconds
+Drawing time: 0.001380 seconds
+Number of particles: 320, Simulation time: 16.377243 seconds
+Drawing time: 5.000000 seconds
+Drawing time: 0.001419 seconds
+Drawing time: 5.000000 seconds
+Drawing time: 0.017868 seconds
+Drawing time: 5.000000 seconds
+Drawing time: 0.002705 seconds
+Drawing time: 5.000000 seconds
+Drawing time: 0.001431 seconds
+Number of particles: 1000, Simulation time: 108.640510 seconds
+Drawing time: 5.000000 seconds
+Drawing time: 0.028470 seconds
+Number of particles: 1000, Simulation time: 72.447238 seconds
+Drawing time: 5.000000 seconds
+Drawing time: 0.001044 seconds
+Number of particles: 10000, Simulation time: 828.325754 seconds
+Drawing time: 5.000000 seconds
+Drawing time: 0.001950 seconds
+Number of particles: 100, Simulation time: 16.396557 seconds

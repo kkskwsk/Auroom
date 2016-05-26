@@ -56,28 +56,28 @@ classdef Receiver2dModel < handle %mog³oby dziedziczyæ po Transducer
         
         function [leftEarImpulseResponse, rightEarImpulseResponse] = binauralize(this, imageSource, impulse, simulationContext)
             %filtracja zwi¹zana z odbiciami od œcian
-            tic
+            %tic
             filteredBuffer = impulse * imageSource.getWallFilter().getCoeffsB();
             %filteredBuffer = Dsp.filter(impulse, imageSource.getWallFilter());
-            fprintf(1, 'Przetwarzanie odbicia od œcian: %d [sec]\n', toc);
+            %fprintf(1, 'Przetwarzanie odbicia od œcian: %d [sec]\n', toc);
             
             %dodane opóŸnienie
-            tic
+            %tic
             distance = this.calcDistanceFromImageSource(imageSource);
             delayTime = distance / simulationContext.getSpeedOfSound();
             delaySamples = round(delayTime * simulationContext.getSettings().simulation.sampleRate);
             filteredBuffer = delay(filteredBuffer, delaySamples);
-            fprintf(1, 'Przetwarzanie opóŸnienia: %d [sec]\n', toc);
+            %fprintf(1, 'Przetwarzanie opóŸnienia: %d [sec]\n', toc);
             
             %filtracja zwi¹zana z przebyt¹ odleg³oœci¹ oraz transmitancj¹
             %oœrodka
-            tic
+            %tic
             attFactor = 1/(distance);
             %filteredBuffer = Dsp.filter(filteredBuffer, getAirFilter(distance));
             filteredBuffer = filteredBuffer.*attFactor;
-            fprintf(1, 'Przetwarzanie propagacji przez medium: %d [sec]\n', toc);
+            %fprintf(1, 'Przetwarzanie propagacji przez medium: %d [sec]\n', toc);
             %filtracja binauralna (HRTF)
-            tic
+            %tic
             imageSourcePositionVector = imageSource.getPositionVector();
             directionVector = this.getPositionVector() - imageSourcePositionVector;
             directionVector = directionVector.normalize();
@@ -96,7 +96,7 @@ classdef Receiver2dModel < handle %mog³oby dziedziczyæ po Transducer
             [leftEarFilter, rightEarFilter] = this.hrtf.getFilters(angle);
             leftEarImpulseResponse = Dsp.filter(filteredBuffer, leftEarFilter);
             rightEarImpulseResponse = Dsp.filter(filteredBuffer, rightEarFilter);
-            fprintf(1, 'Przetwarzanie binauralne: %d [sec]\n', toc);
+            %fprintf(1, 'Przetwarzanie binauralne: %d [sec]\n', toc);
         end
         
         function filter = getHrtf(this, imageSource)

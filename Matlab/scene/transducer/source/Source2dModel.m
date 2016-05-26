@@ -53,33 +53,41 @@ classdef Source2dModel < handle
                 error('number of particles is not initialized');
             end
             
-            FID = fopen('simulation_log.txt', 'a');
-            
-            tic;
-            j = 0;
+            particleIndex = 0;
             quant = 360/this.numberOfParticles;
             angles = 0:(quant):360-quant;
-            startEnergy = 1/this.numberOfParticles;
             
-            for i = angles 
-                j = j+1;
-                particle = SoundParticle(this, i, startEnergy); 
+            for i = 1:length(angles)
+                particle = SoundParticle(this, angles(i));
+                this.particles(i) = particle;
+            end
+            tic
+            particlesLocal = this.particles;
+            parfor j = 1:length(angles)
+                particle = particlesLocal(j);
                 particle.shoot(simulationContext);
-                this.particles(j) = particle;
+                particlesLocal(j) = particle;
             end
             
-            fprintf(FID, 'Number of particles: %d, Simulation time: %f seconds\n', length(this.particles), toc);
-            fclose(FID);
+            this.particles = particlesLocal;
+            %for i = 1:length(angles)
+            %    this.particles(i).shoot(simulationContext);
+            %end
+            
+            %tic
+            %for i = angles 
+            %    particleIndex = particleIndex + 1;
+            %    particle = SoundParticle(this, i);
+            %    particle.shoot(simulationContext);
+            %    this.particles(particleIndex) = particle;
+            %end
+            fprintf('time of full processing: %d [sec]\n', toc);
         end
         
         function drawRays(this, drawing2dContext)
-            tic;
-            FID = fopen('simulation_log.txt', 'a');
             for i = 1:length(this.particles)
                 this.particles(i).draw(drawing2dContext);
             end
-            fprintf(FID, 'Drawing time: %f seconds\n', drawing2dContext.getLineWidth(), toc);
-            fclose(FID);
         end
         
         %Getters

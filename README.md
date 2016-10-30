@@ -1,2 +1,2 @@
 # Auroom
-2D sound field simulator for enclosed spaces based on deterministic ray-tracing.
+2D basis for the 3D version. Proper simulator can be found in the Auroom3D repository.
